@@ -3,6 +3,8 @@ import { Injectable } from '@nestjs/common';
 import * as sharp from 'sharp';
 import { join } from 'path';
 import * as fs from 'fs';
+import * as path from 'path';
+
 @Injectable()
 export class ImageService {
     private readonly uploadPath = '/var/www/images';
@@ -28,20 +30,33 @@ export class ImageService {
   }
 
   async transformImage(filename: string, width: number, height: number, quality: number): Promise<string> {
-    const inputPath = join(this.uploadPath, filename);
-    const transformedPath = join(this.uploadPath, `transformed-${width}x${height}-${filename}`);
-
+    // Wenn filename bereits den vollständigen Pfad enthält, diesen verwenden
+    const inputPath = filename.startsWith(this.uploadPath)
+      ? filename
+      : join(this.uploadPath, filename);
+  
+    const transformedPath = join(this.uploadPath, `transformed-${width}x${height}-${path.basename(filename)}`);
+  
+    console.log('Input path:', inputPath);
+    console.log('Transformed path:', transformedPath);
+  
     // Prüfe, ob die transformierte Version bereits existiert
     if (fs.existsSync(transformedPath)) {
       return transformedPath;
     }
-
+  
     // Transformiere das Bild
-    await sharp(inputPath)
-      .resize(width, height, { fit: 'cover' })
-      .jpeg({ quality }) // Qualität einstellen
-      .toFile(transformedPath);
-
+    try {
+      await sharp(inputPath)
+        .resize(width, height, { fit: 'cover' })
+        .jpeg({ quality }) // Qualität einstellen
+        .toFile(transformedPath);
+    } catch (error) {
+      console.error('Error during image transformation:', error.message);
+      throw new Error(`Failed to transform image: ${error.message}`);
+    }
+  
     return transformedPath;
   }
+  
 }
