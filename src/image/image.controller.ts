@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Query, Res, Param, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Query, Res, Param, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
 import { ImageService } from './image.service';
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import { join } from 'path';
+import * as fs from 'fs';
 
 @Controller('images')
 export class ImageController {
@@ -41,7 +42,17 @@ export class ImageController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: '/var/www/images',
+        destination: (req, file, cb) => {
+          const folder = req.body.folder || 'default'; // Ordner aus Anfrage oder Standard-Ordner
+          const uploadPath = `/var/www/images/${folder}`;
+
+          // Ordner erstellen, falls nicht vorhanden
+          if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+          }
+
+          cb(null, uploadPath);
+        },
         filename: (req, file, cb) => {
           const fileExtension = file.originalname.split('.').pop();
           const fileName = `${uuidv4()}.${fileExtension}`;
@@ -50,7 +61,8 @@ export class ImageController {
       }),
     }),
   )
-  uploadFile(@UploadedFile() file: Express.Multer.File) {
-    return { url: `/images/${file.filename}` };
+  uploadFile(@UploadedFile() file: Express.Multer.File, @Body() body: { folder?: string }) {
+    const folder = body.folder || 'default';
+    return { url: `/images/${folder}/${file.filename}` };
   }
 }
